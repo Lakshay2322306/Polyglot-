@@ -3,7 +3,7 @@ document.getElementById("translateBtn").addEventListener("click", () => {
   const fromLang = document.getElementById("fromLanguage").value;
   const toLang = document.getElementById("toLanguage").value;
 
-  fetch("https://your-backend-url.onrender.com/translate", {
+  fetch("https://polyglot-backend-4fcz.onrender.com", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
