@@ -1,31 +1,57 @@
-document.getElementById("translateBtn").addEventListener("click", () => {
-  const inputText = document.getElementById("inputText").value.trim();
-  const fromLang = document.getElementById("fromLanguage").value;
-  const toLang = document.getElementById("toLanguage").value;
-  const output = document.getElementById("output");
+function translateText() {
+    const inputText = document.getElementById('inputText').value.trim();
+    const sourceLang = document.getElementById('fromLanguage').value;
+    const targetLang = document.getElementById('toLanguage').value;
+    const errorMessageDiv = document.getElementById('errorMessage');
+    const translateButton = document.querySelector('.translate-btn');
 
-  if (!inputText) {
-    output.innerText = "Please enter text to translate.";
-    return;
-  }
+    errorMessageDiv.style.display = 'none';
+    errorMessageDiv.textContent = '';
 
-  output.innerText = "Translating...";
+    if (!inputText) {
+        errorMessageDiv.textContent = 'Please enter text to translate';
+        errorMessageDiv.style.display = 'flex';
+        return;
+    }
 
-  fetch("https://polyglot-backend-4fcz.onrender.com/translate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: inputText,
-      source_lang: fromLang,
-      target_lang: toLang
+    const cacheKey = `${inputText}|${sourceLang}|${targetLang}`;
+    if (translationCache[cacheKey]) {
+        updateModal(inputText, translationCache[cacheKey]);
+        document.getElementById('translationModal').style.display = 'flex';
+        return;
+    }
+
+    translateButton.disabled = true;
+    translateButton.textContent = 'Translating...';
+
+    fetch('https://polyglot-backend-4fcz.onrender.com/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            text: inputText,
+            source_lang: sourceLang,
+            target_lang: targetLang
+        })
     })
-  })
-  .then(res => res.json())
-  .then(data => {
-    output.innerText = data.translated_text || data.error || "No response received.";
-  })
-  .catch((err) => {
-    console.error("Translation error:", err);
-    output.innerText = "Translation failed. Check your internet or try again.";
-  });
-});
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            errorMessageDiv.textContent = data.error;
+            errorMessageDiv.style.display = 'flex';
+        } else {
+            translationCache[cacheKey] = data.translated_text;
+            sessionStorage.setItem('translationCache', JSON.stringify(translationCache));
+            updateModal(data.original_text, data.translated_text);
+            document.getElementById('translationModal').style.display = 'flex';
+        }
+    })
+    .catch(error => {
+        errorMessageDiv.textContent = 'Error: Unable to connect to the translation service';
+        errorMessageDiv.style.display = 'flex';
+        console.error('Translation error:', error);
+    })
+    .finally(() => {
+        translateButton.disabled = false;
+        translateButton.textContent = '🌐 Translate';
+    });
+}
