@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#5a67d8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>PolyGlot Pro</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192x192.png">
+    <!-- Telegram Web App Script (for Telegram Web App compatibility) -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * {
             margin: 0;
@@ -27,18 +35,30 @@
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--primary-gradient);
             min-height: 100vh;
             padding: 20px;
             line-height: 1.6;
-            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation; /* Improve touch responsiveness */
         }
 
         .app-container {
             max-width: 1200px;
             margin: 0 auto;
+            position: relative;
+            padding-bottom: env(safe-area-inset-bottom); /* Support for iOS notch */
         }
 
         .bg-animation {
@@ -49,6 +69,7 @@
             height: 100%;
             z-index: -1;
             opacity: 0.15;
+            pointer-events: none; /* Prevent interaction with background */
         }
 
         .floating-shapes {
@@ -139,6 +160,8 @@
             background: white;
             transition: var(--transition);
             width: 100%;
+            -webkit-appearance: none; /* Fix for mobile select styling */
+            appearance: none;
         }
 
         .language-selector:focus, .input-text:focus {
@@ -172,11 +195,17 @@
             gap: 6px;
             position: relative;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
         }
 
         .feature-btn:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-hover);
+        }
+
+        .feature-btn:active {
+            transform: translateY(0);
+            box-shadow: var(--shadow-soft);
         }
 
         .feature-btn:disabled {
@@ -208,6 +237,7 @@
             justify-content: center;
             align-items: center;
             z-index: 1000;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
 
         .modal-content {
@@ -216,6 +246,8 @@
             border-radius: var(--border-radius);
             max-width: 700px;
             width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
             box-shadow: var(--shadow-soft);
             animation: slideIn 0.5s ease-out;
             position: relative;
@@ -268,6 +300,7 @@
             font-size: 1.3rem;
             font-weight: 500;
             color: var(--text-primary);
+            word-wrap: break-word;
         }
 
         .translation-arrow {
@@ -319,18 +352,63 @@
 
         .sidebar-ad {
             margin: 20px 0;
+            text-align: center;
         }
 
+        /* Responsive Design Updates */
         @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
             .app-title { font-size: 2.8rem; }
+            .app-subtitle { font-size: 1rem; }
             .controls-grid { grid-template-columns: 1fr; }
             .translation-result { grid-template-columns: 1fr; gap: 15px; }
             .translation-arrow { transform: rotate(90deg); }
+            .control-panel { padding: 20px; }
+            .modal-content { padding: 20px; max-height: 70vh; }
+            .ad-container div, .sidebar-ad div {
+                width: 100%;
+                max-width: 336px;
+                height: auto;
+                aspect-ratio: 336 / 280; /* Maintain ad aspect ratio */
+            }
         }
 
         @media (max-width: 480px) {
             .app-title { font-size: 2.2rem; }
+            .app-subtitle { font-size: 0.9rem; }
             .feature-buttons { flex-direction: column; }
+            .feature-btn { width: 100%; justify-content: center; }
+            .control-panel { padding: 15px; }
+            .modal-content { padding: 15px; }
+            .text-content { font-size: 1.1rem; }
+            .floating-shapes { width: 50px; height: 50px; }
+        }
+
+        @media (max-width: 320px) {
+            .app-title { font-size: 1.8rem; }
+            .control-label { font-size: 0.75rem; }
+            .language-selector, .input-text { font-size: 0.9rem; }
+        }
+
+        /* Telegram Web App Adjustments */
+        .telegram-web-app body {
+            padding: 0;
+            background: #fff; /* Telegram's default background */
+        }
+
+        .telegram-web-app .app-container {
+            padding: 10px;
+        }
+
+        .telegram-web-app .header {
+            margin-bottom: 20px;
+        }
+
+        .telegram-web-app .ad-container {
+            display: none; /* Hide ads in Telegram Web App for better UX */
         }
     </style>
 </head>
@@ -458,6 +536,24 @@
     </div>
 
     <script>
+        // Telegram Web App Integration
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand(); // Expand to full screen in Telegram
+            document.body.classList.add('telegram-web-app');
+        }
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+         // Translation Cache
         const translationCache = {};
         if (sessionStorage.getItem('translationCache')) {
             Object.assign(translationCache, JSON.parse(sessionStorage.getItem('translationCache')));
@@ -536,6 +632,16 @@
                 modal.style.display = 'none';
             }
         };
+
+        // Prevent double-tap zoom on mobile
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (event) => {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
     </script>
 </body>
 </html>
